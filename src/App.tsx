@@ -521,7 +521,16 @@ export default function App() {
 
   const handleGenerateStoryVideos = React.useCallback((
     prompts: Record<string, string>,
-    settings: { model: string; duration: number; resolution: string; },
+    settings: {
+      model: string;
+      duration: number;
+      resolution: string;
+      seedanceSceneRefs?: Record<string, {
+        referenceImageUrl?: string;
+        referenceVideoUrl?: string;
+        referenceAudioUrl?: string;
+      }>;
+    },
     activeNodeIds?: string[]
   ) => {
     // Close modal
@@ -554,6 +563,32 @@ export default function App() {
       // Create a new Video node for each image
       const newNodeId = crypto.randomUUID();
       const PROMPT = prompts[sourceNode.id] || sourceNode.prompt || 'Animated video';
+      const sceneRefs = settings.seedanceSceneRefs?.[sourceNode.id];
+      const isSeedanceModel = settings.model.includes('seedance');
+      const seedanceInputs = isSeedanceModel ? [
+        {
+          id: `${newNodeId}-seedance-first`,
+          type: 'image_url' as const,
+          role: 'first_frame' as const,
+          source: sceneRefs?.referenceImageUrl?.trim() || sourceNode.resultUrl || ''
+        },
+        ...(sceneRefs?.referenceVideoUrl?.trim()
+          ? [{
+            id: `${newNodeId}-seedance-video`,
+            type: 'video_url' as const,
+            role: 'reference_video' as const,
+            source: sceneRefs.referenceVideoUrl.trim()
+          }]
+          : []),
+        ...(sceneRefs?.referenceAudioUrl?.trim()
+          ? [{
+            id: `${newNodeId}-seedance-audio`,
+            type: 'audio_url' as const,
+            role: 'reference_audio' as const,
+            source: sceneRefs.referenceAudioUrl.trim()
+          }]
+          : [])
+      ].filter(input => input.source) : undefined;
 
       const newVideoNode: NodeData = {
         id: newNodeId,
@@ -572,6 +607,14 @@ export default function App() {
         // groupId: undefined, // Explicitly NOT in the group
         videoMode: 'frame-to-frame', // Important for image-to-video
         inputUrl: sourceNode.resultUrl, // Pass image as input
+        videoInputs: seedanceInputs,
+        seedanceAdvanced: isSeedanceModel ? {
+          returnLastFrame: true,
+          priority: 0,
+          seed: -1,
+          executionExpiresAfter: 172800
+        } : undefined,
+        generateAudio: isSeedanceModel ? true : undefined
       };
 
       newNodes.push(newVideoNode);
@@ -1117,10 +1160,11 @@ export default function App() {
                   if (!node.parentIds || node.parentIds.length === 0) return [];
                   return node.parentIds
                     .map(parentId => nodes.find(n => n.id === parentId))
-                    .filter(parent => parent && (parent.type === NodeType.IMAGE || parent.type === NodeType.VIDEO) && parent.resultUrl)
+                    .filter(parent => parent && (parent.type === NodeType.IMAGE || parent.type === NodeType.VIDEO || parent.type === NodeType.AUDIO) && parent.resultUrl)
                     .map(parent => ({
                       id: parent!.id,
                       url: (parent!.type === NodeType.VIDEO ? parent!.lastFrame : parent!.resultUrl) || parent!.resultUrl!,
+                      sourceUrl: parent!.resultUrl!,
                       type: parent!.type
                     }));
                 })()}

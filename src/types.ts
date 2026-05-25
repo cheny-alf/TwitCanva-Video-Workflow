@@ -20,6 +20,31 @@ export enum NodeStatus {
   ERROR = 'error'
 }
 
+export type SeedanceInputType = 'image_url' | 'video_url' | 'audio_url';
+export type SeedanceInputRole =
+  | 'first_frame'
+  | 'last_frame'
+  | 'reference_image'
+  | 'reference_video'
+  | 'reference_audio';
+
+export interface SeedanceVideoInput {
+  id: string;
+  type: SeedanceInputType;
+  role: SeedanceInputRole;
+  source: string; // URL / base64 / asset://
+}
+
+export interface SeedanceAdvancedSettings {
+  callbackUrl?: string;
+  returnLastFrame?: boolean;
+  seed?: number;
+  priority?: number;
+  tools?: Array<{ type: string; [key: string]: any }>;
+  executionExpiresAfter?: number;
+  serviceTier?: 'default' | 'flex';
+}
+
 export interface NodeData {
   id: string;
   type: NodeType;
@@ -45,6 +70,9 @@ export interface NodeData {
   videoDuration?: number; // Video duration in seconds (e.g., 5, 6, 8, 10)
   generateAudio?: boolean; // Whether to generate native audio (Kling 2.6, Veo 3.1)
   inputUrl?: string; // Input URL for video generation (image-to-video)
+  videoInputs?: SeedanceVideoInput[]; // Seedance multi-modal inputs (image/video/audio)
+  seedanceAdvanced?: SeedanceAdvancedSettings; // Seedance advanced request settings
+  endFrameImageUrl?: string; // Returned last frame image URL from Seedance when enabled
 
   // Video Editor specific
   trimStart?: number; // Trim start time in seconds

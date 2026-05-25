@@ -15,7 +15,7 @@ import { ChangeAnglePanel } from './ChangeAnglePanel';
 interface CanvasNodeProps {
   data: NodeData;
   inputUrl?: string;
-  connectedImageNodes?: { id: string; url: string; type?: NodeType }[]; // For frame-to-frame video mode and motion control
+  connectedImageNodes?: { id: string; url: string; sourceUrl?: string; type?: NodeType }[]; // For frame-to-frame video mode and motion control
   onUpdate: (id: string, updates: Partial<NodeData>) => void;
   onGenerate: (id: string) => void;
   onAddNext: (id: string, type: 'left' | 'right') => void;

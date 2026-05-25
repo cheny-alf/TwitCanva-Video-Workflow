@@ -11,6 +11,7 @@ import path from 'path';
 import { generateKlingVideo, generateKlingImage, generateKlingMultiImage } from '../services/kling.js';
 import { generateGeminiImage, generateVeoVideo } from '../services/gemini.js';
 import { generateHailuoVideo } from '../services/hailuo.js';
+import { generateSeedanceVideo } from '../services/seedance.js';
 import { generateOpenAIImage } from '../services/openai.js';
 import { resolveImageToBase64, saveBufferToFile } from '../utils/imageHelpers.js';
 
@@ -186,8 +187,27 @@ router.post('/generate-image', async (req, res) => {
 
 router.post('/generate-video', async (req, res) => {
     try {
-        const { nodeId, prompt, imageBase64: rawImageBase64, lastFrameBase64: rawLastFrameBase64, motionReferenceUrl: rawMotionReferenceUrl, aspectRatio, resolution, duration, videoModel } = req.body;
-        const { GEMINI_API_KEY, KLING_ACCESS_KEY, KLING_SECRET_KEY, HAILUO_API_KEY, VIDEOS_DIR } = req.app.locals;
+        const {
+            nodeId,
+            prompt,
+            imageBase64: rawImageBase64,
+            lastFrameBase64: rawLastFrameBase64,
+            motionReferenceUrl: rawMotionReferenceUrl,
+            aspectRatio,
+            resolution,
+            duration,
+            videoModel,
+            generateAudio,
+            seedanceContent,
+            returnLastFrame,
+            seed,
+            priority,
+            tools,
+            executionExpiresAfter,
+            callbackUrl,
+            serviceTier
+        } = req.body;
+        const { GEMINI_API_KEY, KLING_ACCESS_KEY, KLING_SECRET_KEY, HAILUO_API_KEY, ARK_API_KEY, VIDEOS_DIR, IMAGES_DIR } = req.app.locals;
 
         // Resolve file URLs to base64
         const imageBase64 = resolveImageToBase64(rawImageBase64);
@@ -197,8 +217,10 @@ router.post('/generate-video', async (req, res) => {
         // Determine provider
         const isKlingModel = videoModel && videoModel.startsWith('kling-');
         const isHailuoModel = videoModel && videoModel.startsWith('hailuo-');
+        const isSeedanceModel = videoModel && videoModel.includes('seedance');
 
         let videoBuffer;
+        let endFrameImageUrl;
 
         if (isKlingModel) {
             // --- KLING AI VIDEO GENERATION ---
@@ -312,6 +334,50 @@ router.post('/generate-video', async (req, res) => {
             }
             videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
 
+        } else if (isSeedanceModel) {
+            // --- SEEDANCE VIDEO GENERATION (Volcengine Ark) ---
+            if (!ARK_API_KEY) {
+                return res.status(500).json({
+                    error: "ARK_API_KEY not configured. Add ARK_API_KEY to .env for Seedance models."
+                });
+            }
+
+            const seedanceResult = await generateSeedanceVideo({
+                prompt,
+                modelId: videoModel,
+                aspectRatio,
+                resolution,
+                duration,
+                generateAudio,
+                seedanceContent,
+                returnLastFrame,
+                seed,
+                priority,
+                tools,
+                executionExpiresAfter,
+                callbackUrl,
+                serviceTier,
+                apiKey: ARK_API_KEY
+            });
+
+            const videoResponse = await fetch(seedanceResult.videoUrl);
+            if (!videoResponse.ok) {
+                throw new Error('Failed to download video from Seedance');
+            }
+            videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+
+            if (seedanceResult.lastFrameUrl) {
+                try {
+                    const frameResponse = await fetch(seedanceResult.lastFrameUrl);
+                    if (frameResponse.ok) {
+                        const frameBuffer = Buffer.from(await frameResponse.arrayBuffer());
+                        const savedFrame = saveBufferToFile(frameBuffer, IMAGES_DIR, 'seedance_frame', 'png');
+                        endFrameImageUrl = savedFrame.url;
+                    }
+                } catch (frameError) {
+                    console.warn('Seedance last frame fetch failed:', frameError.message);
+                }
+            }
         } else {
             // --- VEO VIDEO GENERATION (Default) ---
             if (!GEMINI_API_KEY) {
@@ -327,7 +393,7 @@ router.post('/generate-video', async (req, res) => {
                 aspectRatio,
                 resolution,
                 duration: duration || 8,
-                generateAudio: req.body.generateAudio !== false, // Default to true
+                generateAudio: generateAudio !== false, // Default to true
                 apiKey: GEMINI_API_KEY
             });
         }
@@ -352,7 +418,7 @@ router.post('/generate-video', async (req, res) => {
         fs.writeFileSync(path.join(VIDEOS_DIR, `${metadataId}.json`), JSON.stringify(metadata, null, 2));
 
         console.log(`Video saved: ${saved.url} (model: ${videoModel || 'veo-3.1'})`);
-        return res.json({ resultUrl: saved.url });
+        return res.json({ resultUrl: saved.url, endFrameImageUrl });
 
     } catch (error) {
         console.error("Server Video Gen Error:", error);

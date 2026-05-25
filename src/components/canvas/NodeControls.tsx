@@ -8,7 +8,7 @@
 
 import React, { useState, useRef, useEffect, memo } from 'react';
 import { Sparkles, Banana, Settings2, Check, ChevronDown, ChevronUp, GripVertical, Image as ImageIcon, Film, Clock, Expand, Shrink, Monitor, Crop, HardDrive } from 'lucide-react';
-import { NodeData, NodeStatus, NodeType } from '../../types';
+import { NodeData, NodeStatus, NodeType, SeedanceInputRole, SeedanceInputType, SeedanceVideoInput } from '../../types';
 import { OpenAIIcon, GoogleIcon, KlingIcon, HailuoIcon } from '../icons/BrandIcons';
 import { useFaceDetection } from '../../hooks/useFaceDetection';
 import { ChangeAnglePanel } from './ChangeAnglePanel';
@@ -19,7 +19,7 @@ interface NodeControlsProps {
     inputUrl?: string;
     isLoading: boolean;
     isSuccess: boolean;
-    connectedImageNodes?: { id: string; url: string; type?: NodeType }[]; // Connected parent nodes
+    connectedImageNodes?: { id: string; url: string; sourceUrl?: string; type?: NodeType }[]; // Connected parent nodes
     onUpdate: (id: string, updates: Partial<NodeData>) => void;
     onGenerate: (id: string) => void;
     onChangeAngleGenerate?: (nodeId: string) => void;
@@ -50,6 +50,9 @@ const VIDEO_ASPECT_RATIOS = ["16:9", "9:16"];
 
 const VIDEO_MODELS = [
     { id: 'veo-3.1', name: 'Veo 3.1', provider: 'google', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: true, durations: [4, 6, 8], resolutions: ['Auto', '720p', '1080p'], aspectRatios: ['16:9', '9:16'] },
+    // Seedance (Ark)
+    { id: 'doubao-seedance-2-0-pro', name: 'Seedance 2.0 Pro', provider: 'seedance', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: true, durations: [4, 5, 6, 8, 10, 12, 15, -1], resolutions: ['480p', '720p', '1080p'], aspectRatios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive'] },
+    { id: 'doubao-seedance-2-0-fast', name: 'Seedance 2.0 Fast', provider: 'seedance', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: true, durations: [4, 5, 6, 8, 10, 12, 15, -1], resolutions: ['480p', '720p'], aspectRatios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive'] },
     // Kling AI models - Consolidated: removed legacy v1, v1-5, v1-6, v2-master
     { id: 'kling-v2-1', name: 'Kling V2.1', provider: 'kling', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: true, recommended: true, durations: [5, 10], resolutions: ['Auto', '720p', '1080p'], aspectRatios: ['16:9', '9:16'] },
     { id: 'kling-v2-1-master', name: 'Kling V2.1 Master', provider: 'kling', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: true, durations: [5, 10], resolutions: ['Auto', '720p', '1080p'], aspectRatios: ['16:9', '9:16'] },
@@ -60,6 +63,16 @@ const VIDEO_MODELS = [
     { id: 'hailuo-2.3-fast', name: 'Hailuo 2.3 Fast', provider: 'hailuo', supportsTextToVideo: false, supportsImageToVideo: true, supportsMultiImage: false, durations: [5], resolutions: ['768p', '1080p'], aspectRatios: ['16:9', '9:16'] },
     { id: 'hailuo-02', name: 'Hailuo 02', provider: 'hailuo', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: true, durations: [5], resolutions: ['768p', '1080p'], aspectRatios: ['16:9', '9:16'] },
 ];
+
+const SEEDANCE_RATIO_OPTIONS = ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive'];
+const SEEDANCE_RESOLUTION_OPTIONS = ['480p', '720p', '1080p'];
+const SEEDANCE_DURATION_OPTIONS = [4, 5, 6, 8, 10, 12, 15, -1];
+
+const SEEDANCE_ROLE_OPTIONS: Record<SeedanceInputType, SeedanceInputRole[]> = {
+    image_url: ['first_frame', 'last_frame', 'reference_image'],
+    video_url: ['reference_video'],
+    audio_url: ['reference_audio']
+};
 
 // Image model versions with metadata
 // supportsImageToImage: Can use a single reference image (for image-to-image transformation)
@@ -290,7 +303,8 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
     useEffect(() => {
         if (data.type === NodeType.VIDEO) {
             const shouldAutoExpand = connectedImageNodes.length >= 2 ||
-                (data.videoModel === 'kling-v2-6' && connectedImageNodes.length > 0);
+                (data.videoModel === 'kling-v2-6' && connectedImageNodes.length > 0) ||
+                (data.videoModel || '').includes('seedance');
             if (shouldAutoExpand) {
                 setShowAdvanced(true);
             }
@@ -371,6 +385,7 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
 
     // Video model selection logic
     const currentVideoModel = VIDEO_MODELS.find(m => m.id === data.videoModel) || VIDEO_MODELS[0];
+    const isSeedanceModel = currentVideoModel.provider === 'seedance' || (data.videoModel || '').includes('seedance');
     const isFrameToFrame = data.videoMode === 'frame-to-frame';
 
     // Determine video generation mode based on inputs and settings
@@ -389,6 +404,7 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
     // Filter video models based on mode
     const availableVideoModels = VIDEO_MODELS.filter(model => {
         if (videoGenerationMode === 'motion-control') return model.id === 'kling-v2-6'; // Only Kling 2.6 for now
+        if (model.provider === 'seedance') return true; // Seedance supports multi-modal combinations
         if (videoGenerationMode === 'text-to-video') return model.supportsTextToVideo;
         if (videoGenerationMode === 'image-to-video') return model.supportsImageToVideo;
         return model.supportsMultiImage; // frame-to-frame
@@ -407,9 +423,26 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
     const handleVideoModelChange = (modelId: string) => {
         const newModel = VIDEO_MODELS.find(m => m.id === modelId);
         const updates: Partial<typeof data> = { videoModel: modelId };
+        const switchingToSeedance = newModel?.provider === 'seedance';
 
         // Reset duration if current duration is not supported by new model
-        if (newModel?.durations && data.videoDuration && !newModel.durations.includes(data.videoDuration)) {
+        if (switchingToSeedance) {
+            if (!data.videoDuration || !SEEDANCE_DURATION_OPTIONS.includes(data.videoDuration)) {
+                updates.videoDuration = 5;
+            }
+            if (!data.aspectRatio || !SEEDANCE_RATIO_OPTIONS.includes(data.aspectRatio)) {
+                updates.aspectRatio = 'adaptive';
+            }
+            const seedanceResolutions = newModel?.id === 'doubao-seedance-2-0-fast'
+                ? ['480p', '720p']
+                : SEEDANCE_RESOLUTION_OPTIONS;
+            if (!data.resolution || !seedanceResolutions.includes(data.resolution)) {
+                updates.resolution = '720p';
+            }
+            if (data.generateAudio === undefined) {
+                updates.generateAudio = true;
+            }
+        } else if (newModel?.durations && data.videoDuration && !newModel.durations.includes(data.videoDuration)) {
             updates.videoDuration = newModel.durations[0];
         }
 
@@ -428,11 +461,16 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
     };
 
     // Get available durations for current model
-    const availableDurations = currentVideoModel.durations || [5];
+    const availableDurations = isSeedanceModel ? SEEDANCE_DURATION_OPTIONS : (currentVideoModel.durations || [5]);
     const currentDuration = data.videoDuration || availableDurations[0];
 
     // Get available resolutions for current model (considering duration for models with durationResolutionMap)
     const getAvailableResolutions = () => {
+        if (isSeedanceModel) {
+            return currentVideoModel.id === 'doubao-seedance-2-0-fast'
+                ? ['480p', '720p']
+                : SEEDANCE_RESOLUTION_OPTIONS;
+        }
         const model = currentVideoModel as any;
         if (model.durationResolutionMap && currentDuration) {
             return model.durationResolutionMap[currentDuration] || model.resolutions || VIDEO_RESOLUTIONS;
@@ -546,6 +584,82 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
         return 0;
     });
 
+    const createSeedanceInput = (
+        type: SeedanceInputType,
+        role: SeedanceInputRole,
+        source: string
+    ): SeedanceVideoInput => ({
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type,
+        role,
+        source
+    });
+
+    // Sync connected image/video nodes into seedance input list (as defaults).
+    useEffect(() => {
+        if (!isVideoNode || !isSeedanceModel) return;
+
+        const existing = data.videoInputs || [];
+        const existingBySource = new Map(existing.map(item => [item.source, item]));
+        const nextInputs: SeedanceVideoInput[] = [...existing];
+
+        connectedImageNodes.forEach((node, index) => {
+            const source = node.sourceUrl || node.url;
+            if (!source || existingBySource.has(source)) return;
+
+            if (node.type === NodeType.VIDEO) {
+                nextInputs.push(createSeedanceInput('video_url', 'reference_video', source));
+                existingBySource.set(source, nextInputs[nextInputs.length - 1]);
+                return;
+            }
+
+            // Image input role defaults: first connected is first_frame, second is last_frame, rest are reference_image.
+            const role: SeedanceInputRole =
+                index === 0 ? 'first_frame' : index === 1 ? 'last_frame' : 'reference_image';
+            nextInputs.push(createSeedanceInput('image_url', role, source));
+            existingBySource.set(source, nextInputs[nextInputs.length - 1]);
+        });
+
+        // Keep user-defined manual rows even when source has no connection.
+        if (nextInputs.length !== existing.length) {
+            onUpdate(data.id, { videoInputs: nextInputs });
+        }
+    }, [connectedImageNodes, data.id, data.videoInputs, isSeedanceModel, isVideoNode, onUpdate]);
+
+    const updateSeedanceInput = (id: string, updates: Partial<SeedanceVideoInput>) => {
+        const inputs = (data.videoInputs || []).map(item => item.id === id ? { ...item, ...updates } : item);
+        onUpdate(data.id, { videoInputs: inputs });
+    };
+
+    const removeSeedanceInput = (id: string) => {
+        const inputs = (data.videoInputs || []).filter(item => item.id !== id);
+        onUpdate(data.id, { videoInputs: inputs });
+    };
+
+    const addSeedanceInput = (type: SeedanceInputType) => {
+        const defaultRole = SEEDANCE_ROLE_OPTIONS[type][0];
+        const input = createSeedanceInput(type, defaultRole, '');
+        onUpdate(data.id, { videoInputs: [...(data.videoInputs || []), input] });
+    };
+
+    const seedanceInputs = data.videoInputs || [];
+    const seedanceImageCount = seedanceInputs.filter(i => i.type === 'image_url' && i.source.trim()).length;
+    const seedanceVideoCount = seedanceInputs.filter(i => i.type === 'video_url' && i.source.trim()).length;
+    const seedanceAudioCount = seedanceInputs.filter(i => i.type === 'audio_url' && i.source.trim()).length;
+
+    const getSeedanceValidationError = (): string | undefined => {
+        if (!isSeedanceModel || !isVideoNode) return undefined;
+        if (seedanceImageCount > 9) return 'Seedance 图片参考最多 9 张。';
+        if (seedanceVideoCount > 3) return 'Seedance 视频参考最多 3 条。';
+        if (seedanceAudioCount > 3) return 'Seedance 音频参考最多 3 条。';
+        if (seedanceAudioCount > 0 && (seedanceImageCount + seedanceVideoCount) === 0) {
+            return '音频不能单独输入，请至少提供 1 张图片或 1 条视频。';
+        }
+        return undefined;
+    };
+
+    const seedanceValidationError = getSeedanceValidationError();
+
     // Inverse scaling for the prompt bar to keep it readable when zooming out
     // When zooming in (zoom > 0.8), we let it zoom 1:1 with the canvas (localScale = 1)
     // When zooming out (zoom < 0.8), we keep it at least at 0.8 effective scale
@@ -644,6 +758,11 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                     {data.errorMessage}
                 </div>
             )}
+            {seedanceValidationError && (
+                <div className="text-amber-300 text-xs mb-2 p-2 bg-amber-900/20 rounded border border-amber-700/50">
+                    {seedanceValidationError}
+                </div>
+            )}
 
             {/* Motion Control Warning - when motion mode detected but no character image */}
             {isVideoNode && videoGenerationMode === 'motion-control' && imageInputCount === 0 && (
@@ -723,6 +842,8 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                                         <GoogleIcon size={12} className="text-white" />
                                     ) : currentVideoModel.provider === 'kling' ? (
                                         <KlingIcon size={14} />
+                                    ) : currentVideoModel.provider === 'hailuo' ? (
+                                        <HailuoIcon size={14} />
                                     ) : (
                                         <Film size={12} className="text-cyan-400" />
                                     )}
@@ -763,6 +884,29 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                                                             ) : (
                                                                 <Film size={12} className="text-cyan-400" />
                                                             )}
+                                                            {model.name}
+                                                        </span>
+                                                        {currentVideoModel.id === model.id && <Check size={12} />}
+                                                    </button>
+                                                ))}
+                                            </>
+                                        )}
+
+                                        {/* Kling Models */}
+                                        {availableVideoModels.filter(m => m.provider === 'seedance').length > 0 && (
+                                            <>
+                                                <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-[#1f1f1f] border-t border-neutral-700">
+                                                    Seedance
+                                                </div>
+                                                {availableVideoModels.filter(m => m.provider === 'seedance').map(model => (
+                                                    <button
+                                                        key={model.id}
+                                                        onClick={() => handleVideoModelChange(model.id)}
+                                                        className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#333] transition-colors ${currentVideoModel.id === model.id ? 'text-blue-400' : 'text-neutral-300'
+                                                            }`}
+                                                    >
+                                                        <span className="flex items-center gap-2">
+                                                            <Film size={12} className="text-cyan-400" />
                                                             {model.name}
                                                         </span>
                                                         {currentVideoModel.id === model.id && <Check size={12} />}
@@ -1051,7 +1195,7 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                                     className="flex items-center gap-1.5 text-xs font-medium bg-[#252525] hover:bg-[#333] border border-neutral-700 text-white px-2.5 py-1.5 rounded-lg transition-colors"
                                 >
                                     <Clock size={12} className="text-cyan-400" />
-                                    {currentDuration}s
+                                    {currentDuration === -1 ? 'Auto' : `${currentDuration}s`}
                                 </button>
 
                                 {/* Duration Dropdown Menu */}
@@ -1066,7 +1210,7 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                                                 onClick={() => handleDurationChange(dur)}
                                                 className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#333] transition-colors ${currentDuration === dur ? 'text-blue-400' : 'text-neutral-300'}`}
                                             >
-                                                <span>{dur}s</span>
+                                                <span>{dur === -1 ? 'Auto' : `${dur}s`}</span>
                                                 {currentDuration === dur && <Check size={12} />}
                                             </button>
                                         ))}
@@ -1082,25 +1226,33 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                                 data.imageModel === 'kling-v1-5' &&
                                 data.klingReferenceMode === 'face' &&
                                 (data.faceDetectionStatus === 'error' || data.faceDetectionStatus === 'loading');
+                            const isSeedanceBlocked = isVideoNode && isSeedanceModel && !!seedanceValidationError;
+                            const isGenerateBlocked = isFaceModeBlocked || isSeedanceBlocked;
 
                             return (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        if (isFaceModeBlocked) {
+                                        if (isGenerateBlocked) {
                                             // Show a warning - this is handled by the warning component
                                             return;
                                         }
                                         onGenerate(data.id);
                                     }}
-                                    disabled={isFaceModeBlocked}
-                                    className={`group w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 ${isFaceModeBlocked
+                                    disabled={isGenerateBlocked}
+                                    className={`group w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 ${isGenerateBlocked
                                         ? 'bg-neutral-700/50 cursor-not-allowed opacity-50'
                                         : isDark
                                             ? 'bg-white text-neutral-900 hover:bg-neutral-100 active:scale-95'
                                             : 'bg-neutral-900 text-white hover:bg-neutral-800 active:scale-95'
                                         }`}
-                                    title={isFaceModeBlocked ? 'Cannot generate: No face detected in reference image' : 'Generate'}
+                                    title={
+                                        isFaceModeBlocked
+                                            ? 'Cannot generate: No face detected in reference image'
+                                            : isSeedanceBlocked
+                                                ? seedanceValidationError
+                                                : 'Generate'
+                                    }
                                 >
                                     <svg
                                         viewBox="0 0 24 24"
@@ -1295,8 +1447,8 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                         {/* Advanced Settings Content - Only for Video nodes */}
                         {showAdvanced && isVideoNode && (
                             <div className="mt-3 space-y-3">
-                                {/* Audio Toggle - Only for Kling 2.6 (Veo 3.1 SDK doesn't support generateAudio yet) */}
-                                {data.videoModel === 'kling-v2-6' && (
+                                {/* Audio Toggle - Kling 2.6 / Seedance */}
+                                {(data.videoModel === 'kling-v2-6' || isSeedanceModel) && (
                                     <div className="inline-flex items-center gap-2 px-2.5 py-1.5 bg-neutral-800/50 rounded-lg w-fit">
                                         <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
@@ -1310,6 +1462,155 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                                                 className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-md ${data.generateAudio !== false ? 'left-4' : 'left-0.5'}`}
                                             />
                                         </button>
+                                    </div>
+                                )}
+
+                                {/* Seedance multi-modal inputs */}
+                                {isSeedanceModel && (
+                                    <div className="space-y-2 p-2 rounded-lg border border-neutral-800 bg-neutral-900/40">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[10px] text-neutral-500 uppercase tracking-wider">
+                                                Seedance Inputs
+                                            </label>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => addSeedanceInput('image_url')}
+                                                    className="px-2 py-1 text-[10px] rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
+                                                >
+                                                    +Image
+                                                </button>
+                                                <button
+                                                    onClick={() => addSeedanceInput('video_url')}
+                                                    className="px-2 py-1 text-[10px] rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
+                                                >
+                                                    +Video
+                                                </button>
+                                                <button
+                                                    onClick={() => addSeedanceInput('audio_url')}
+                                                    className="px-2 py-1 text-[10px] rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
+                                                >
+                                                    +Audio
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {seedanceInputs.length === 0 ? (
+                                            <div className="text-xs text-neutral-500 py-1">
+                                                可仅用文本生成；也可添加图片/视频/音频参考。
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {seedanceInputs.map((input) => (
+                                                    <div key={input.id} className="grid grid-cols-[110px_120px_1fr_26px] gap-1 items-center">
+                                                        <select
+                                                            value={input.type}
+                                                            onChange={(e) => {
+                                                                const type = e.target.value as SeedanceInputType;
+                                                                updateSeedanceInput(input.id, {
+                                                                    type,
+                                                                    role: SEEDANCE_ROLE_OPTIONS[type][0]
+                                                                });
+                                                            }}
+                                                            className="bg-neutral-800 text-neutral-200 text-[11px] px-2 py-1 rounded border border-neutral-700"
+                                                        >
+                                                            <option value="image_url">image_url</option>
+                                                            <option value="video_url">video_url</option>
+                                                            <option value="audio_url">audio_url</option>
+                                                        </select>
+                                                        <select
+                                                            value={input.role}
+                                                            onChange={(e) => updateSeedanceInput(input.id, { role: e.target.value as SeedanceInputRole })}
+                                                            className="bg-neutral-800 text-neutral-200 text-[11px] px-2 py-1 rounded border border-neutral-700"
+                                                        >
+                                                            {SEEDANCE_ROLE_OPTIONS[input.type].map(role => (
+                                                                <option key={role} value={role}>{role}</option>
+                                                            ))}
+                                                        </select>
+                                                        <input
+                                                            value={input.source}
+                                                            onChange={(e) => updateSeedanceInput(input.id, { source: e.target.value })}
+                                                            placeholder="URL / data:*;base64 / asset://..."
+                                                            className="bg-neutral-800 text-neutral-200 text-[11px] px-2 py-1 rounded border border-neutral-700 outline-none"
+                                                        />
+                                                        <button
+                                                            onClick={() => removeSeedanceInput(input.id)}
+                                                            className="text-neutral-500 hover:text-red-400 text-xs"
+                                                            title="Remove"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <div className="text-[10px] text-neutral-500">
+                                            限制：图片≤9、视频≤3、音频≤3；音频不可单独输入。
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <label className="text-[10px] text-neutral-400 flex items-center gap-1">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={data.seedanceAdvanced?.returnLastFrame === true}
+                                                    onChange={(e) => onUpdate(data.id, {
+                                                        seedanceAdvanced: {
+                                                            ...(data.seedanceAdvanced || {}),
+                                                            returnLastFrame: e.target.checked
+                                                        }
+                                                    })}
+                                                />
+                                                return_last_frame
+                                            </label>
+                                            <label className="text-[10px] text-neutral-400 flex items-center gap-1">
+                                                priority
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    max={9}
+                                                    value={data.seedanceAdvanced?.priority ?? 0}
+                                                    onChange={(e) => onUpdate(data.id, {
+                                                        seedanceAdvanced: {
+                                                            ...(data.seedanceAdvanced || {}),
+                                                            priority: Number(e.target.value)
+                                                        }
+                                                    })}
+                                                    className="w-12 bg-neutral-800 text-neutral-200 rounded px-1 py-0.5 border border-neutral-700"
+                                                />
+                                            </label>
+                                            <label className="text-[10px] text-neutral-400 flex items-center gap-1">
+                                                seed
+                                                <input
+                                                    type="number"
+                                                    value={data.seedanceAdvanced?.seed ?? -1}
+                                                    onChange={(e) => onUpdate(data.id, {
+                                                        seedanceAdvanced: {
+                                                            ...(data.seedanceAdvanced || {}),
+                                                            seed: Number(e.target.value)
+                                                        }
+                                                    })}
+                                                    className="w-16 bg-neutral-800 text-neutral-200 rounded px-1 py-0.5 border border-neutral-700"
+                                                />
+                                            </label>
+                                            <label className="text-[10px] text-neutral-400 flex items-center gap-1">
+                                                timeout(s)
+                                                <input
+                                                    type="number"
+                                                    min={3600}
+                                                    max={259200}
+                                                    value={data.seedanceAdvanced?.executionExpiresAfter ?? 172800}
+                                                    onChange={(e) => onUpdate(data.id, {
+                                                        seedanceAdvanced: {
+                                                            ...(data.seedanceAdvanced || {}),
+                                                            executionExpiresAfter: Number(e.target.value)
+                                                        }
+                                                    })}
+                                                    className="w-20 bg-neutral-800 text-neutral-200 rounded px-1 py-0.5 border border-neutral-700"
+                                                />
+                                            </label>
+                                        </div>
+                                        <div className="text-[10px] text-neutral-600">
+                                            注：Seedance 2.0 暂不支持 camera_fixed，该参数已在前端禁用。
+                                        </div>
                                     </div>
                                 )}
 

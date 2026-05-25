@@ -20,6 +20,11 @@ interface StoryboardVideoModalProps {
             model: string;
             duration: number;
             resolution: string;
+            seedanceSceneRefs?: Record<string, {
+                referenceImageUrl?: string;
+                referenceVideoUrl?: string;
+                referenceAudioUrl?: string;
+            }>;
         },
         activeNodeIds: string[]
     ) => void;
@@ -47,6 +52,8 @@ const VIDEO_MODELS = [
             8: ['Auto', '720p', '1080p']
         }
     },
+    { id: 'doubao-seedance-2-0-pro', name: 'Seedance 2.0 Pro', provider: 'seedance', durations: [4, 5, 6, 8, 10, 12, 15, -1], resolutions: ['480p', '720p', '1080p'] },
+    { id: 'doubao-seedance-2-0-fast', name: 'Seedance 2.0 Fast', provider: 'seedance', durations: [4, 5, 6, 8, 10, 12, 15, -1], resolutions: ['480p', '720p'] },
     { id: 'kling-v2-1', name: 'Kling V2.1', provider: 'kling', recommended: true, durations: [5, 10], resolutions: ['Auto', '720p', '1080p'] },
     { id: 'kling-v2-1-master', name: 'Kling V2.1 Master', provider: 'kling', durations: [5, 10], resolutions: ['Auto', '720p', '1080p'] },
     { id: 'kling-v2-5-turbo', name: 'Kling V2.5 Turbo', provider: 'kling', durations: [5, 10], resolutions: ['Auto', '720p', '1080p'] },
@@ -85,6 +92,11 @@ export const StoryboardVideoModal: React.FC<StoryboardVideoModalProps> = ({
     });
     const [generatingPrompts, setGeneratingPrompts] = useState<Record<string, boolean>>({});
     const [optimizingPrompts, setOptimizingPrompts] = useState<Record<string, boolean>>({});
+    const [sceneRefs, setSceneRefs] = useState<Record<string, {
+        referenceImageUrl?: string;
+        referenceVideoUrl?: string;
+        referenceAudioUrl?: string;
+    }>>({});
     const [showModelDropdown, setShowModelDropdown] = useState(false);
     const modelDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -159,6 +171,15 @@ export const StoryboardVideoModal: React.FC<StoryboardVideoModalProps> = ({
                 }
             });
             setPrompts(initialPrompts);
+            const initialRefs: Record<string, { referenceImageUrl?: string; referenceVideoUrl?: string; referenceAudioUrl?: string }> = {};
+            sortedScenes.forEach(scene => {
+                initialRefs[scene.id] = {
+                    referenceImageUrl: '',
+                    referenceVideoUrl: '',
+                    referenceAudioUrl: ''
+                };
+            });
+            setSceneRefs(initialRefs);
         }
     }, [isOpen, scenes]);
 
@@ -378,6 +399,46 @@ export const StoryboardVideoModal: React.FC<StoryboardVideoModalProps> = ({
                                                 </div>
                                             )}
                                         </div>
+                                        {settings.model.includes('seedance') && (
+                                            <div className="space-y-2">
+                                                <input
+                                                    value={sceneRefs[scene.id]?.referenceImageUrl || ''}
+                                                    onChange={(e) => setSceneRefs(prev => ({
+                                                        ...prev,
+                                                        [scene.id]: {
+                                                            ...(prev[scene.id] || {}),
+                                                            referenceImageUrl: e.target.value
+                                                        }
+                                                    }))}
+                                                    placeholder="(可选) 覆盖首帧图片 URL / base64 / asset://"
+                                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-purple-500/50"
+                                                />
+                                                <input
+                                                    value={sceneRefs[scene.id]?.referenceVideoUrl || ''}
+                                                    onChange={(e) => setSceneRefs(prev => ({
+                                                        ...prev,
+                                                        [scene.id]: {
+                                                            ...(prev[scene.id] || {}),
+                                                            referenceVideoUrl: e.target.value
+                                                        }
+                                                    }))}
+                                                    placeholder="(可选) reference_video URL / base64 / asset://"
+                                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-purple-500/50"
+                                                />
+                                                <input
+                                                    value={sceneRefs[scene.id]?.referenceAudioUrl || ''}
+                                                    onChange={(e) => setSceneRefs(prev => ({
+                                                        ...prev,
+                                                        [scene.id]: {
+                                                            ...(prev[scene.id] || {}),
+                                                            referenceAudioUrl: e.target.value
+                                                        }
+                                                    }))}
+                                                    placeholder="(可选) reference_audio URL / base64 / asset://"
+                                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-purple-500/50"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -422,6 +483,22 @@ export const StoryboardVideoModal: React.FC<StoryboardVideoModalProps> = ({
                                                 >
                                                     <div className="flex items-center gap-2">
                                                         <GoogleIcon size={14} className={settings.model === model.id ? 'text-blue-400' : 'text-neutral-400'} />
+                                                        {model.name}
+                                                    </div>
+                                                    {settings.model === model.id && <Check size={14} />}
+                                                </button>
+                                            ))}
+
+                                            {/* Kling */}
+                                            <div className="px-3 py-2 text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-[#1a1a1a] border-t border-neutral-700">Seedance</div>
+                                            {VIDEO_MODELS.filter(m => m.provider === 'seedance').map(model => (
+                                                <button
+                                                    key={model.id}
+                                                    onClick={() => handleModelChange(model.id)}
+                                                    className={`w-full flex items-center justify-between px-3 py-2.5 text-xs hover:bg-[#2a2a2a] transition-colors ${settings.model === model.id ? 'text-blue-400 bg-blue-500/10' : 'text-neutral-300'}`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <Film size={14} className="text-cyan-400" />
                                                         {model.name}
                                                     </div>
                                                     {settings.model === model.id && <Check size={14} />}
@@ -476,7 +553,7 @@ export const StoryboardVideoModal: React.FC<StoryboardVideoModalProps> = ({
                                     className="bg-neutral-800 text-white text-xs px-3 py-2 rounded-lg border border-neutral-700 focus:outline-none focus:border-purple-500 min-w-[80px]"
                                 >
                                     {currentModel.durations.map(d => (
-                                        <option key={d} value={d}>{d}s</option>
+                                        <option key={d} value={d}>{d === -1 ? 'Auto' : `${d}s`}</option>
                                     ))}
                                 </select>
                             </div>
@@ -500,10 +577,17 @@ export const StoryboardVideoModal: React.FC<StoryboardVideoModalProps> = ({
                         <div className="flex items-center gap-3">
                             <div className="text-right mr-2">
                                 <div className="text-xs text-neutral-400">Est. cost</div>
-                                <div className="text-sm font-medium text-white">~{(sortedScenes.length * 0.1 * (settings.duration / 5)).toFixed(2)} credits</div>
+                                <div className="text-sm font-medium text-white">~{(sortedScenes.length * 0.1 * ((settings.duration === -1 ? 5 : settings.duration) / 5)).toFixed(2)} credits</div>
                             </div>
                             <button
-                                onClick={() => onCreateVideos(prompts, settings, sortedScenes.map(s => s.id))}
+                                onClick={() => onCreateVideos(
+                                    prompts,
+                                    {
+                                        ...settings,
+                                        seedanceSceneRefs: sceneRefs
+                                    },
+                                    sortedScenes.map(s => s.id)
+                                )}
                                 className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white pl-4 pr-5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-purple-900/40 flex items-center gap-2"
                             >
                                 <Play size={16} fill="currentColor" />

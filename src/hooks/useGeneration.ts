@@ -234,7 +234,11 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                 // Get non-TEXT parent nodes (image sources only)
                 const imageParentIds = node.parentIds?.filter(pid => {
                     const parent = nodes.find(n => n.id === pid);
-                    return parent?.type !== NodeType.TEXT;
+                    return parent?.type === NodeType.IMAGE || parent?.type === NodeType.VIDEO;
+                }) || [];
+                const seedanceMediaParentIds = node.parentIds?.filter(pid => {
+                    const parent = nodes.find(n => n.id === pid);
+                    return parent?.type === NodeType.IMAGE || parent?.type === NodeType.VIDEO || parent?.type === NodeType.AUDIO;
                 }) || [];
 
                 // Check for frame-to-frame mode (explicit or auto-detected from 2+ image parents)
@@ -313,8 +317,57 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                     }
                 }
 
+                const seedanceModel = isSeedanceModel(node.videoModel);
+
+                let seedanceContent: Array<any> | undefined;
+                if (seedanceModel) {
+                    let rawInputs = node.videoInputs || [];
+                    if (rawInputs.length === 0 && seedanceMediaParentIds.length > 0) {
+                        rawInputs = seedanceMediaParentIds
+                            .map((parentId, index) => {
+                                const parent = nodes.find(n => n.id === parentId);
+                                if (!parent?.resultUrl) return null;
+                                if (parent.type === NodeType.VIDEO) {
+                                    return {
+                                        id: `${parent.id}-ref-video`,
+                                        type: 'video_url' as const,
+                                        role: 'reference_video' as const,
+                                        source: parent.resultUrl
+                                    };
+                                }
+                                if (parent.type === NodeType.AUDIO) {
+                                    return {
+                                        id: `${parent.id}-ref-audio`,
+                                        type: 'audio_url' as const,
+                                        role: 'reference_audio' as const,
+                                        source: parent.resultUrl
+                                    };
+                                }
+                                return {
+                                    id: `${parent.id}-ref-image`,
+                                    type: 'image_url' as const,
+                                    role: (index === 0 ? 'first_frame' : index === 1 ? 'last_frame' : 'reference_image') as const,
+                                    source: parent.resultUrl
+                                };
+                            })
+                            .filter(Boolean) as NonNullable<NodeData['videoInputs']>;
+                    }
+
+                    const inputs = rawInputs.map(mapSeedanceInput).filter(Boolean);
+                    const text = combinedPrompt?.trim();
+                    seedanceContent = text
+                        ? [{ type: 'text', text }, ...inputs]
+                        : inputs;
+
+                    const hasAudio = inputs.some(item => item.type === 'audio_url');
+                    const hasImageOrVideo = inputs.some(item => item.type === 'image_url' || item.type === 'video_url');
+                    if (hasAudio && !hasImageOrVideo) {
+                        throw new Error('音频不能单独输入，请至少提供 1 张图片或 1 条视频。');
+                    }
+                }
+
                 // Generate video
-                const rawResultUrl = await generateVideo({
+                const videoResult = await generateVideo({
                     prompt: combinedPrompt,
                     imageBase64,
                     lastFrameBase64,
@@ -324,12 +377,20 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                     videoModel: node.videoModel,
                     motionReferenceUrl,
                     generateAudio: node.generateAudio, // For Kling 2.6 and Veo 3.1 native audio
+                    seedanceContent,
+                    returnLastFrame: node.seedanceAdvanced?.returnLastFrame,
+                    seed: node.seedanceAdvanced?.seed,
+                    priority: node.seedanceAdvanced?.priority,
+                    tools: node.seedanceAdvanced?.tools,
+                    callbackUrl: node.seedanceAdvanced?.callbackUrl,
+                    executionExpiresAfter: node.seedanceAdvanced?.executionExpiresAfter,
+                    serviceTier: node.seedanceAdvanced?.serviceTier,
                     nodeId: id
                 });
 
                 // Add cache-busting parameter to force browser to fetch new video
                 // (Backend uses nodeId as filename, so URL is the same for regenerated videos)
-                const resultUrl = `${rawResultUrl}?t=${Date.now()}`;
+                const resultUrl = `${videoResult.resultUrl}?t=${Date.now()}`;
 
                 // Extract last frame for chaining
                 const lastFrame = await extractVideoLastFrame(resultUrl);
@@ -358,6 +419,7 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                     resultAspectRatio,
                     aspectRatio,
                     lastFrame,
+                    endFrameImageUrl: videoResult.endFrameImageUrl,
                     errorMessage: undefined // Clear any previous error
                 });
 
@@ -387,3 +449,31 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
         handleGenerate
     };
 };
+    const isSeedanceModel = (model?: string) => !!model && model.includes('seedance');
+
+    const mapSeedanceInput = (input: NonNullable<NodeData['videoInputs']>[number]) => {
+        const source = input.source?.trim();
+        if (!source) return null;
+
+        if (input.type === 'image_url') {
+            return {
+                type: 'image_url' as const,
+                role: input.role,
+                image_url: { url: source }
+            };
+        }
+
+        if (input.type === 'video_url') {
+            return {
+                type: 'video_url' as const,
+                role: input.role,
+                video_url: { url: source }
+            };
+        }
+
+        return {
+            type: 'audio_url' as const,
+            role: input.role,
+            audio_url: { url: source }
+        };
+    };

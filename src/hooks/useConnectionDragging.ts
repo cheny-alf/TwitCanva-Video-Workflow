@@ -124,11 +124,12 @@ export const useConnectionDragging = () => {
          * Rules:
          * - IMAGE → IMAGE, VIDEO, IMAGE_EDITOR: ✅ (image as input)
          * - VIDEO → VIDEO: ✅ (video chaining via lastFrame)
+         * - AUDIO → VIDEO: ✅ (Seedance reference audio)
          * - VIDEO → IMAGE, IMAGE_EDITOR: ❌ (can't generate image from video)
          * - TEXT → IMAGE, VIDEO: ✅ (text provides prompt)
          * - TEXT → TEXT, IMAGE_EDITOR: ❌ (no text chaining, no text editing)
          * - Any → TEXT: ❌ (text nodes can't receive input)
-         * - AUDIO: ❌ (not supported yet)
+         * - Other AUDIO relations: ❌
          */
         const isValidConnection = (parentId: string, childId: string): boolean => {
             const parentNode = nodes.find(n => n.id === parentId);
@@ -136,9 +137,9 @@ export const useConnectionDragging = () => {
 
             if (!parentNode || !childNode) return false;
 
-            // AUDIO nodes not supported yet
+            // AUDIO currently only supports AUDIO -> VIDEO
             if (parentNode.type === NodeType.AUDIO || childNode.type === NodeType.AUDIO) {
-                return false;
+                return parentNode.type === NodeType.AUDIO && childNode.type === NodeType.VIDEO;
             }
 
             // STORYBOARD nodes - allow connections to/from for now (future feature)
