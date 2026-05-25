@@ -114,6 +114,14 @@ https://github.com/user-attachments/assets/3c36de54-d37e-4875-8403-5b6e4a6216e0
    
    # Get from https://fal.ai/dashboard/keys (for Kling V2.6 Motion Control)
    FAL_API_KEY=your_fal_api_key_here
+
+   # Optional: Custom API base URLs (fallback to defaults if not set)
+   # KLING default: https://api-singapore.klingai.com
+   KLING_BASE_URL=
+   # HAILUO default: https://api.minimax.io/v1
+   HAILUO_BASE_URL=
+   # FAL default: https://fal.run
+   FAL_BASE_URL=
    
    # Optional: X (Twitter) Post Feature - Get from https://developer.twitter.com/en/portal
    # See docs/post-to-x.md for detailed setup instructions
@@ -507,4 +515,3 @@ If you are using this project for commercial purposes or building a commercial p
 ---
 
 **Built with ❤️ using React, TypeScript, and AI APIs from OpenAI, Google, Kling, MiniMax, and Fal.ai (2025)**
-

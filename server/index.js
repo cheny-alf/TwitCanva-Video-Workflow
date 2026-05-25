@@ -66,7 +66,7 @@ const getClient = () => {
 
 const KLING_ACCESS_KEY = process.env.KLING_ACCESS_KEY;
 const KLING_SECRET_KEY = process.env.KLING_SECRET_KEY;
-const KLING_BASE_URL = 'https://api-singapore.klingai.com';
+const KLING_BASE_URL = process.env.KLING_BASE_URL || 'https://api-singapore.klingai.com';
 
 if (!KLING_ACCESS_KEY || !KLING_SECRET_KEY) {
     console.warn("SERVER WARNING: KLING_ACCESS_KEY or KLING_SECRET_KEY not set. Kling AI models will not work.");

@@ -15,7 +15,8 @@
 // CONFIGURATION
 // ============================================================================
 
-const HAILUO_BASE_URL = 'https://api.minimax.io/v1';
+const DEFAULT_HAILUO_BASE_URL = 'https://api.minimax.io/v1';
+const HAILUO_BASE_URL = (process.env.HAILUO_BASE_URL || DEFAULT_HAILUO_BASE_URL).replace(/\/+$/, '');
 
 // ============================================================================
 // HELPER FUNCTIONS

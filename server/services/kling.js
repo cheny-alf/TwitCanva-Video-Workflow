@@ -11,7 +11,8 @@ import crypto from 'crypto';
 // CONFIGURATION
 // ============================================================================
 
-const KLING_BASE_URL = 'https://api-singapore.klingai.com';
+const DEFAULT_KLING_BASE_URL = 'https://api-singapore.klingai.com';
+const KLING_BASE_URL = (process.env.KLING_BASE_URL || DEFAULT_KLING_BASE_URL).replace(/\/+$/, '');
 
 // ============================================================================
 // JWT AUTHENTICATION
