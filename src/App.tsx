@@ -47,6 +47,7 @@ import { CreateAssetModal } from './components/modals/CreateAssetModal';
 import { TikTokImportModal } from './components/modals/TikTokImportModal';
 import { TwitterPostModal } from './components/modals/TwitterPostModal';
 import { TikTokPostModal } from './components/modals/TikTokPostModal';
+import { ApiKeyConfigModal } from './components/modals/ApiKeyConfigModal';
 import { AssetLibraryPanel } from './components/AssetLibraryPanel';
 import { useTikTokImport } from './hooks/useTikTokImport';
 import { useStoryboardGenerator } from './hooks/useStoryboardGenerator';
@@ -94,7 +95,31 @@ const UI_TEXT = {
       storyboardGenerator: 'Storyboard Generator',
       storyboardGeneratorDesc: 'Create scenes with AI',
       languageSwitch: 'Switch Language',
+      apiKeyConfig: 'API Key Config',
       profile: 'Profile'
+    },
+    apiKeyConfig: {
+      title: 'API Key Configuration',
+      subtitle: 'Update provider keys for image and video generation.',
+      keyConfigured: 'Configured',
+      keyNotConfigured: 'Not configured',
+      maskedHintPrefix: 'Current: ',
+      noChanges: 'No changes to save.',
+      saveSuccess: 'Saved and applied immediately for generation APIs.',
+      saveFailedPrefix: 'Save failed: ',
+      loadFailedPrefix: 'Load failed: ',
+      cancel: 'Cancel',
+      save: 'Save',
+      saving: 'Saving...',
+      clear: 'Clear',
+      paste: 'Paste',
+      refresh: 'Refresh',
+      show: 'Show',
+      hide: 'Hide',
+      scopeLabel: 'Effective scope:',
+      edited: 'Edited',
+      clipboardDenied: 'Clipboard permission denied',
+      loading: 'Loading...'
     },
     topbar: {
       renameHint: 'Double-click to rename',
@@ -154,7 +179,31 @@ const UI_TEXT = {
       storyboardGenerator: '分镜生成器',
       storyboardGeneratorDesc: '用 AI 创建场景',
       languageSwitch: '切换语言',
+      apiKeyConfig: 'API Key 配置',
       profile: '个人资料'
+    },
+    apiKeyConfig: {
+      title: 'API Key 配置',
+      subtitle: '在线更新图像与视频生成所用的供应商密钥。',
+      keyConfigured: '已配置',
+      keyNotConfigured: '未配置',
+      maskedHintPrefix: '当前：',
+      noChanges: '没有需要保存的变更。',
+      saveSuccess: '保存成功，并已对生成接口即时生效。',
+      saveFailedPrefix: '保存失败：',
+      loadFailedPrefix: '加载失败：',
+      cancel: '取消',
+      save: '保存',
+      saving: '保存中...',
+      clear: '清空',
+      paste: '粘贴',
+      refresh: '刷新',
+      show: '显示',
+      hide: '隐藏',
+      scopeLabel: '生效范围：',
+      edited: '已修改',
+      clipboardDenied: '没有剪贴板权限',
+      loading: '加载中...'
     },
     topbar: {
       renameHint: '双击重命名',
@@ -215,6 +264,7 @@ export default function App() {
   });
 
   const [canvasTheme, setCanvasTheme] = useState<'dark' | 'light'>('dark');
+  const [isApiKeyConfigOpen, setIsApiKeyConfigOpen] = useState(false);
   const [locale, setLocale] = useState<Locale>(() => {
     const savedLocale = localStorage.getItem('twitcanva-locale');
     return savedLocale === 'zh' ? 'zh' : 'en';
@@ -1114,6 +1164,7 @@ export default function App() {
           }}
           canvasTheme={canvasTheme}
           onToggleLanguage={() => setLocale(prev => prev === 'en' ? 'zh' : 'en')}
+          onConfigClick={() => setIsApiKeyConfigOpen(true)}
           locale={locale}
           text={text.toolbar}
         />
@@ -1174,6 +1225,12 @@ export default function App() {
         isOpen={tiktokModal.isOpen}
         onClose={() => setTiktokModal(prev => ({ ...prev, isOpen: false }))}
         mediaUrl={tiktokModal.mediaUrl}
+      />
+
+      <ApiKeyConfigModal
+        isOpen={isApiKeyConfigOpen}
+        onClose={() => setIsApiKeyConfigOpen(false)}
+        text={text.apiKeyConfig}
       />
 
       {/* Storyboard Generator Modal */}

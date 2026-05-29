@@ -2,12 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   LayoutGrid,
   Image as ImageIcon,
-  MessageSquare,
   History,
   Wrench,
-  MoreHorizontal,
   Plus,
-  Film
+  Film,
+  Settings
 } from 'lucide-react';
 
 // ============================================================================
@@ -39,6 +38,7 @@ interface ToolbarProps {
   onStoryboardClick?: (e: React.MouseEvent) => void;
   onToolsOpen?: () => void; // Called when tools dropdown opens to close other panels
   onToggleLanguage?: () => void;
+  onConfigClick?: () => void;
   canvasTheme?: 'dark' | 'light';
   locale?: 'en' | 'zh';
   text?: {
@@ -51,6 +51,7 @@ interface ToolbarProps {
     storyboardGenerator: string;
     storyboardGeneratorDesc: string;
     languageSwitch: string;
+    apiKeyConfig: string;
     profile: string;
   };
 }
@@ -68,6 +69,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onStoryboardClick,
   onToolsOpen,
   onToggleLanguage,
+  onConfigClick,
   canvasTheme = 'dark'
   ,
   locale = 'en',
@@ -110,6 +112,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     storyboardGenerator: 'Storyboard Generator',
     storyboardGeneratorDesc: 'Create scenes with AI',
     languageSwitch: 'Switch Language',
+    apiKeyConfig: 'API Key Config',
     profile: 'Profile'
   };
 
@@ -214,6 +217,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         title={labels.languageSwitch}
       >
         {locale === 'zh' ? '中' : 'EN'}
+      </button>
+
+      <button
+        className={`w-9 h-9 rounded-full flex items-center justify-center mb-1 transition-all duration-200 hover:scale-110 ${isDark ? 'bg-neutral-800 text-neutral-200 border border-neutral-700 hover:bg-neutral-700' : 'bg-neutral-100 text-neutral-800 border border-neutral-300 hover:bg-neutral-200'
+          }`}
+        onClick={onConfigClick}
+        title={labels.apiKeyConfig}
+      >
+        <Settings size={14} />
       </button>
 
       <button className={`w-8 h-8 rounded-full overflow-hidden mb-2 hover:scale-110 transition-all duration-200 ${isDark ? 'border border-neutral-700' : 'border border-neutral-300'

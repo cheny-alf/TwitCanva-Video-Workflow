@@ -17,6 +17,7 @@ import tiktokPostRoutes from './routes/tiktok-post.js';
 import { processTikTokVideo, isValidTikTokUrl } from './tools/tiktok.js';
 import localModelsRoutes from './routes/local-models.js';
 import storyboardRoutes from './routes/storyboard.js';
+import runtimeConfigRoutes from './routes/runtime-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -117,6 +118,7 @@ app.locals.ARK_API_KEY = ARK_API_KEY;
 app.locals.IMAGES_DIR = IMAGES_DIR;
 app.locals.VIDEOS_DIR = VIDEOS_DIR;
 app.locals.LIBRARY_DIR = LIBRARY_DIR;
+app.locals.ENV_FILE_PATH = path.join(__dirname, '..', '.env');
 
 // ============================================================================
 // WORKFLOW SANITIZATION HELPERS
@@ -239,6 +241,9 @@ app.use('/api/local-models', localModelsRoutes);
 
 // Mount Storyboard routes (AI script generation)
 app.use('/api/storyboard', storyboardRoutes);
+
+// Mount runtime config routes (dynamic API key settings)
+app.use('/api/runtime-config', runtimeConfigRoutes);
 
 // NOTE: Old Kling helpers removed - now in server/services/kling.js
 
