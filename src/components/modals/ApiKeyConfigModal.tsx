@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Eye, EyeOff, Loader2, RefreshCw, Settings2, X } from 'lucide-react';
 import {
     API_KEY_FIELDS,
-    ApiKeyField,
+    BASE_URL_FIELDS,
+    RuntimeConfigField,
+    RUNTIME_CONFIG_FIELD_TYPE,
     getApiKeyConfig,
     updateApiKeyConfig
 } from '../../services/runtimeConfigService';
@@ -40,7 +42,7 @@ interface ApiKeyConfigModalProps {
 }
 
 const buildEmptyRecord = <T extends string>(initialValue: string): Record<T, string> => {
-    return Object.fromEntries(API_KEY_FIELDS.map(key => [key, initialValue])) as Record<T, string>;
+    return Object.fromEntries([...API_KEY_FIELDS, ...BASE_URL_FIELDS].map(key => [key, initialValue])) as Record<T, string>;
 };
 
 export const ApiKeyConfigModal: React.FC<ApiKeyConfigModalProps> = ({
@@ -48,16 +50,16 @@ export const ApiKeyConfigModal: React.FC<ApiKeyConfigModalProps> = ({
     onClose,
     text
 }) => {
-    const [values, setValues] = useState<Record<ApiKeyField, string>>(buildEmptyRecord<ApiKeyField>(''));
-    const [maskedValues, setMaskedValues] = useState<Record<ApiKeyField, string>>(buildEmptyRecord<ApiKeyField>(''));
-    const [isSetMap, setIsSetMap] = useState<Record<ApiKeyField, boolean>>(
-        Object.fromEntries(API_KEY_FIELDS.map(key => [key, false])) as Record<ApiKeyField, boolean>
+    const [values, setValues] = useState<Record<RuntimeConfigField, string>>(buildEmptyRecord<RuntimeConfigField>(''));
+    const [maskedValues, setMaskedValues] = useState<Record<RuntimeConfigField, string>>(buildEmptyRecord<RuntimeConfigField>(''));
+    const [isSetMap, setIsSetMap] = useState<Record<RuntimeConfigField, boolean>>(
+        Object.fromEntries([...API_KEY_FIELDS, ...BASE_URL_FIELDS].map(key => [key, false])) as Record<RuntimeConfigField, boolean>
     );
-    const [showValueMap, setShowValueMap] = useState<Record<ApiKeyField, boolean>>(
-        Object.fromEntries(API_KEY_FIELDS.map(key => [key, false])) as Record<ApiKeyField, boolean>
+    const [showValueMap, setShowValueMap] = useState<Record<RuntimeConfigField, boolean>>(
+        Object.fromEntries([...API_KEY_FIELDS, ...BASE_URL_FIELDS].map(key => [key, false])) as Record<RuntimeConfigField, boolean>
     );
-    const [dirtyMap, setDirtyMap] = useState<Record<ApiKeyField, boolean>>(
-        Object.fromEntries(API_KEY_FIELDS.map(key => [key, false])) as Record<ApiKeyField, boolean>
+    const [dirtyMap, setDirtyMap] = useState<Record<RuntimeConfigField, boolean>>(
+        Object.fromEntries([...API_KEY_FIELDS, ...BASE_URL_FIELDS].map(key => [key, false])) as Record<RuntimeConfigField, boolean>
     );
     const [statusType, setStatusType] = useState<StatusType>('idle');
     const [statusMessage, setStatusMessage] = useState('');
@@ -66,7 +68,7 @@ export const ApiKeyConfigModal: React.FC<ApiKeyConfigModalProps> = ({
     const hasAnyChanges = useMemo(() => Object.values(dirtyMap).some(Boolean), [dirtyMap]);
 
     const resetDirty = () => {
-        setDirtyMap(Object.fromEntries(API_KEY_FIELDS.map(key => [key, false])) as Record<ApiKeyField, boolean>);
+        setDirtyMap(Object.fromEntries([...API_KEY_FIELDS, ...BASE_URL_FIELDS].map(key => [key, false])) as Record<RuntimeConfigField, boolean>);
     };
 
     const loadConfig = async () => {
@@ -74,19 +76,23 @@ export const ApiKeyConfigModal: React.FC<ApiKeyConfigModalProps> = ({
         setStatusMessage('');
         try {
             const result = await getApiKeyConfig();
-            const nextMasked = buildEmptyRecord<ApiKeyField>('');
-            const nextSetMap = Object.fromEntries(API_KEY_FIELDS.map(key => [key, false])) as Record<ApiKeyField, boolean>;
+            const nextMasked = buildEmptyRecord<RuntimeConfigField>('');
+            const nextSetMap = Object.fromEntries([...API_KEY_FIELDS, ...BASE_URL_FIELDS].map(key => [key, false])) as Record<RuntimeConfigField, boolean>;
+            const nextValues = buildEmptyRecord<RuntimeConfigField>('');
 
-            for (const key of API_KEY_FIELDS) {
+            for (const key of [...API_KEY_FIELDS, ...BASE_URL_FIELDS] as RuntimeConfigField[]) {
                 const provider = result.providers?.[key];
                 nextMasked[key] = provider?.maskedValue || '';
                 nextSetMap[key] = !!provider?.isSet;
+                if (RUNTIME_CONFIG_FIELD_TYPE[key] === 'url') {
+                    nextValues[key] = provider?.maskedValue || '';
+                }
             }
 
             setMaskedValues(nextMasked);
             setIsSetMap(nextSetMap);
-            setValues(buildEmptyRecord<ApiKeyField>(''));
-            setShowValueMap(Object.fromEntries(API_KEY_FIELDS.map(key => [key, false])) as Record<ApiKeyField, boolean>);
+            setValues(nextValues);
+            setShowValueMap(Object.fromEntries([...API_KEY_FIELDS, ...BASE_URL_FIELDS].map(key => [key, false])) as Record<RuntimeConfigField, boolean>);
             setEffectiveScope(result.effectiveScope || []);
             resetDirty();
             setStatusType('idle');
@@ -103,12 +109,12 @@ export const ApiKeyConfigModal: React.FC<ApiKeyConfigModalProps> = ({
 
     if (!isOpen) return null;
 
-    const updateValue = (key: ApiKeyField, value: string) => {
+    const updateValue = (key: RuntimeConfigField, value: string) => {
         setValues(prev => ({ ...prev, [key]: value }));
         setDirtyMap(prev => ({ ...prev, [key]: true }));
     };
 
-    const handlePaste = async (key: ApiKeyField) => {
+    const handlePaste = async (key: RuntimeConfigField) => {
         try {
             const clipboardText = await navigator.clipboard.readText();
             updateValue(key, clipboardText);
@@ -120,12 +126,12 @@ export const ApiKeyConfigModal: React.FC<ApiKeyConfigModalProps> = ({
     };
 
     const handleSave = async () => {
-        const updates = API_KEY_FIELDS.reduce((acc, key) => {
+        const updates = ([...API_KEY_FIELDS, ...BASE_URL_FIELDS] as RuntimeConfigField[]).reduce((acc, key) => {
             if (dirtyMap[key]) {
                 acc[key] = values[key];
             }
             return acc;
-        }, {} as Partial<Record<ApiKeyField, string>>);
+        }, {} as Partial<Record<RuntimeConfigField, string>>);
 
         if (Object.keys(updates).length === 0) {
             setStatusType('info');
@@ -189,11 +195,13 @@ export const ApiKeyConfigModal: React.FC<ApiKeyConfigModalProps> = ({
                     </div>
 
                     <div className="space-y-4">
-                        {API_KEY_FIELDS.map((key) => {
+                        {[...API_KEY_FIELDS, ...BASE_URL_FIELDS].map((key) => {
+                            const fieldType = RUNTIME_CONFIG_FIELD_TYPE[key];
                             const isVisible = showValueMap[key];
                             const isDirty = dirtyMap[key];
                             const currentValue = values[key];
                             const maskedValue = maskedValues[key];
+                            const isSecretField = fieldType === 'secret';
 
                             return (
                                 <div key={key} className="border border-neutral-800 rounded-xl p-4 bg-[#161616]">
@@ -213,19 +221,21 @@ export const ApiKeyConfigModal: React.FC<ApiKeyConfigModalProps> = ({
 
                                     <div className="flex items-center gap-2">
                                         <input
-                                            type={isVisible ? 'text' : 'password'}
+                                            type={isSecretField ? (isVisible ? 'text' : 'password') : 'text'}
                                             value={currentValue}
                                             onChange={(e) => updateValue(key, e.target.value)}
                                             placeholder={maskedValue ? `${text.maskedHintPrefix}${maskedValue}` : text.keyNotConfigured}
                                             className="flex-1 bg-[#101010] border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
                                         />
-                                        <button
-                                            onClick={() => setShowValueMap(prev => ({ ...prev, [key]: !prev[key] }))}
-                                            className="px-2.5 py-2 rounded-lg border border-neutral-700 text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
-                                            title={isVisible ? text.hide : text.show}
-                                        >
-                                            {isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-                                        </button>
+                                        {isSecretField && (
+                                            <button
+                                                onClick={() => setShowValueMap(prev => ({ ...prev, [key]: !prev[key] }))}
+                                                className="px-2.5 py-2 rounded-lg border border-neutral-700 text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
+                                                title={isVisible ? text.hide : text.show}
+                                            >
+                                                {isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => updateValue(key, '')}
                                             className="px-3 py-2 rounded-lg border border-neutral-700 text-neutral-300 hover:text-white hover:border-neutral-500 text-xs transition-colors"

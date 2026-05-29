@@ -13,7 +13,7 @@ import sharp from 'sharp';
 // ============================================================================
 
 const DEFAULT_FAL_BASE_URL = 'https://fal.run';
-const FAL_BASE_URL = (process.env.FAL_BASE_URL || DEFAULT_FAL_BASE_URL).replace(/\/+$/, '');
+const resolveFalBaseUrl = (customBaseUrl) => (customBaseUrl || process.env.FAL_BASE_URL || DEFAULT_FAL_BASE_URL).replace(/\/+$/, '');
 
 const MOTION_CONTROL_MODEL = 'fal-ai/kling-video/v2.6/pro/motion-control';
 const IMAGE_TO_VIDEO_MODEL = 'fal-ai/kling-video/v2.6/pro/image-to-video';
@@ -25,14 +25,14 @@ const MAX_FILE_SIZE = 9 * 1024 * 1024; // 9MB to be safe (under 10MB limit)
  * Rewrite fal client request URL to a custom base URL if configured.
  * This allows server-side routing through a custom fal gateway/proxy.
  */
-function rewriteFalRequestUrl(url) {
-    if (!url || FAL_BASE_URL === DEFAULT_FAL_BASE_URL) {
+function rewriteFalRequestUrl(url, baseUrl) {
+    if (!url || baseUrl === DEFAULT_FAL_BASE_URL) {
         return url;
     }
 
     try {
         const requestUrl = new URL(url);
-        const customBase = new URL(FAL_BASE_URL);
+        const customBase = new URL(baseUrl);
 
         // fal client can hit multiple hosts internally
         const falHosts = new Set(['fal.run', 'queue.fal.run', 'rest.alpha.fal.ai']);
@@ -51,12 +51,12 @@ function rewriteFalRequestUrl(url) {
 /**
  * Build fal client config with optional custom base URL support.
  */
-function buildFalClientConfig(apiKey) {
+function buildFalClientConfig(apiKey, baseUrl) {
     return {
         credentials: apiKey,
         requestMiddleware: async (request) => ({
             ...request,
-            url: rewriteFalRequestUrl(request.url)
+            url: rewriteFalRequestUrl(request.url, baseUrl)
         })
     };
 }
@@ -208,8 +208,11 @@ export async function generateFalMotionControl({
     motionVideoBase64,
     characterOrientation = 'video',
     keepOriginalSound = true, // Match API default
-    apiKey
+    apiKey,
+    baseUrl
 }) {
+    const falBaseUrl = resolveFalBaseUrl(baseUrl);
+
     console.log('\n========================================');
     console.log('[Fal.ai Motion Control] Starting generation');
     console.log(`[Fal.ai Motion Control] Parameters:`);
@@ -231,7 +234,7 @@ export async function generateFalMotionControl({
     }
 
     // Configure fal client with API key
-    fal.config(buildFalClientConfig(apiKey));
+    fal.config(buildFalClientConfig(apiKey, falBaseUrl));
 
     // Upload files to fal.ai storage (with compression for large images)
     console.log('[Fal.ai Motion Control] Processing and uploading files to fal.ai storage...');
@@ -335,8 +338,11 @@ export async function generateFalImageToVideo({
     imageBase64,
     duration = '5',
     generateAudio = true,
-    apiKey
+    apiKey,
+    baseUrl
 }) {
+    const falBaseUrl = resolveFalBaseUrl(baseUrl);
+
     console.log('\n========================================');
     console.log('[Fal.ai Image-to-Video] Starting Kling 2.6 generation');
     console.log(`[Fal.ai Image-to-Video] Parameters:`);
@@ -354,7 +360,7 @@ export async function generateFalImageToVideo({
     }
 
     // Configure fal client with API key
-    fal.config(buildFalClientConfig(apiKey));
+    fal.config(buildFalClientConfig(apiKey, falBaseUrl));
 
     // Upload image to fal.ai storage (with compression for large images)
     console.log('[Fal.ai Image-to-Video] Processing and uploading image...');

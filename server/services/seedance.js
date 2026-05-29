@@ -8,7 +8,7 @@
 import { resolveImageToBase64 } from '../utils/imageHelpers.js';
 
 const DEFAULT_ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
-const ARK_BASE_URL = (process.env.ARK_BASE_URL || DEFAULT_ARK_BASE_URL).replace(/\/+$/, '');
+const resolveArkBaseUrl = (customBaseUrl) => (customBaseUrl || process.env.ARK_BASE_URL || DEFAULT_ARK_BASE_URL).replace(/\/+$/, '');
 
 function normalizeRatio(ratio) {
   if (!ratio || ratio === 'Auto') return 'adaptive';
@@ -71,12 +71,12 @@ function normalizeSeedanceContent(content = []) {
   return normalized;
 }
 
-async function pollSeedanceTask(taskId, apiKey, maxWaitMs = 12 * 60 * 1000) {
+async function pollSeedanceTask(taskId, apiKey, maxWaitMs = 12 * 60 * 1000, baseUrl) {
   const started = Date.now();
   const intervalMs = 5000;
 
   while (Date.now() - started < maxWaitMs) {
-    const response = await fetch(`${ARK_BASE_URL}/contents/generations/tasks/${taskId}`, {
+    const response = await fetch(`${baseUrl}/contents/generations/tasks/${taskId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -120,12 +120,14 @@ export async function generateSeedanceVideo({
   executionExpiresAfter,
   callbackUrl,
   serviceTier,
-  apiKey
+  apiKey,
+  baseUrl
 }) {
   if (!apiKey) {
     throw new Error('ARK_API_KEY not configured. Add ARK_API_KEY to .env for Seedance models.');
   }
 
+  const arkBaseUrl = resolveArkBaseUrl(baseUrl);
   const model = modelId || 'doubao-seedance-2-0-pro';
   const content = normalizeSeedanceContent(seedanceContent || []);
   const textPrompt = (prompt || '').trim();
@@ -168,7 +170,7 @@ export async function generateSeedanceVideo({
     returnLastFrame: body.return_last_frame
   });
 
-  const response = await fetch(`${ARK_BASE_URL}/contents/generations/tasks`, {
+  const response = await fetch(`${arkBaseUrl}/contents/generations/tasks`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -187,5 +189,5 @@ export async function generateSeedanceVideo({
     throw new Error('Seedance task creation failed: missing task id.');
   }
 
-  return await pollSeedanceTask(result.id, apiKey);
+  return await pollSeedanceTask(result.id, apiKey, 12 * 60 * 1000, arkBaseUrl);
 }

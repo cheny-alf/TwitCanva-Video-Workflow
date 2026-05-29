@@ -24,7 +24,7 @@ const router = express.Router();
 router.post('/generate-image', async (req, res) => {
     try {
         const { nodeId, prompt, aspectRatio, resolution, imageBase64: rawImageBase64, imageModel, klingReferenceMode, klingFaceIntensity, klingSubjectIntensity } = req.body;
-        const { GEMINI_API_KEY, KLING_ACCESS_KEY, KLING_SECRET_KEY, OPENAI_API_KEY, IMAGES_DIR } = req.app.locals;
+        const { GEMINI_API_KEY, KLING_ACCESS_KEY, KLING_SECRET_KEY, KLING_BASE_URL, OPENAI_API_KEY, IMAGES_DIR } = req.app.locals;
 
         // Determine provider
         const isKlingModel = imageModel && imageModel.startsWith('kling-');
@@ -68,7 +68,8 @@ router.post('/generate-image', async (req, res) => {
                     aspectRatio,
                     resolution,
                     accessKey: KLING_ACCESS_KEY,
-                    secretKey: KLING_SECRET_KEY
+                    secretKey: KLING_SECRET_KEY,
+                    baseUrl: KLING_BASE_URL
                 });
             } else if (hasReferenceImages && resolvedImages.length > 1) {
                 // Multiple images with non-V2 model: Use Multi-Image API
@@ -80,7 +81,8 @@ router.post('/generate-image', async (req, res) => {
                     aspectRatio,
                     resolution,
                     accessKey: KLING_ACCESS_KEY,
-                    secretKey: KLING_SECRET_KEY
+                    secretKey: KLING_SECRET_KEY,
+                    baseUrl: KLING_BASE_URL
                 });
             } else {
                 // V1.5 or text-to-image: Use standard API (V1.5 supports image_reference)
@@ -94,7 +96,8 @@ router.post('/generate-image', async (req, res) => {
                     klingFaceIntensity,
                     klingSubjectIntensity,
                     accessKey: KLING_ACCESS_KEY,
-                    secretKey: KLING_SECRET_KEY
+                    secretKey: KLING_SECRET_KEY,
+                    baseUrl: KLING_BASE_URL
                 });
             }
 
@@ -207,7 +210,19 @@ router.post('/generate-video', async (req, res) => {
             callbackUrl,
             serviceTier
         } = req.body;
-        const { GEMINI_API_KEY, KLING_ACCESS_KEY, KLING_SECRET_KEY, HAILUO_API_KEY, ARK_API_KEY, VIDEOS_DIR, IMAGES_DIR } = req.app.locals;
+        const {
+            GEMINI_API_KEY,
+            KLING_ACCESS_KEY,
+            KLING_SECRET_KEY,
+            KLING_BASE_URL,
+            HAILUO_API_KEY,
+            HAILUO_BASE_URL,
+            ARK_API_KEY,
+            ARK_BASE_URL,
+            FAL_BASE_URL,
+            VIDEOS_DIR,
+            IMAGES_DIR
+        } = req.app.locals;
 
         // Resolve file URLs to base64
         const imageBase64 = resolveImageToBase64(rawImageBase64);
@@ -257,7 +272,8 @@ router.post('/generate-video', async (req, res) => {
                         characterImageBase64: imageBase64,
                         motionVideoBase64: motionReferenceUrl,
                         characterOrientation: 'video',
-                        apiKey: FAL_API_KEY
+                        apiKey: FAL_API_KEY,
+                        baseUrl: FAL_BASE_URL
                     });
                 } else {
                     // Standard Image-to-Video mode
@@ -273,7 +289,8 @@ router.post('/generate-video', async (req, res) => {
                         imageBase64,
                         duration: String(duration || 5),
                         generateAudio: req.body.generateAudio !== false, // Default to true
-                        apiKey: FAL_API_KEY
+                        apiKey: FAL_API_KEY,
+                        baseUrl: FAL_BASE_URL
                     });
                 }
             } else {
@@ -295,7 +312,8 @@ router.post('/generate-video', async (req, res) => {
                     duration: duration || 5,
                     motionReferenceUrl,
                     accessKey: KLING_ACCESS_KEY,
-                    secretKey: KLING_SECRET_KEY
+                    secretKey: KLING_SECRET_KEY,
+                    baseUrl: KLING_BASE_URL
                 });
             }
 
@@ -324,7 +342,8 @@ router.post('/generate-video', async (req, res) => {
                 aspectRatio,
                 resolution,
                 duration: duration || 6,
-                apiKey: HAILUO_API_KEY
+                apiKey: HAILUO_API_KEY,
+                baseUrl: HAILUO_BASE_URL
             });
 
             // Download from Hailuo's URL
@@ -357,7 +376,8 @@ router.post('/generate-video', async (req, res) => {
                 executionExpiresAfter,
                 callbackUrl,
                 serviceTier,
-                apiKey: ARK_API_KEY
+                apiKey: ARK_API_KEY,
+                baseUrl: ARK_BASE_URL
             });
 
             const videoResponse = await fetch(seedanceResult.videoUrl);

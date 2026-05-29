@@ -14,6 +14,14 @@ const ALLOWED_API_KEYS = [
     'KLING_SECRET_KEY'
 ];
 
+const ALLOWED_BASE_URLS = [
+    'KLING_BASE_URL',
+    'HAILUO_BASE_URL',
+    'FAL_BASE_URL',
+    'ARK_BASE_URL'
+];
+
+const ALLOWED_FIELDS = [...ALLOWED_API_KEYS, ...ALLOWED_BASE_URLS];
 const EFFECTIVE_SCOPE = ['generate-image', 'generate-video'];
 
 function maskValue(value) {
@@ -36,11 +44,11 @@ function serializeEnvValue(value) {
 
 function buildProviders(appLocals) {
     const providers = {};
-    for (const key of ALLOWED_API_KEYS) {
+    for (const key of ALLOWED_FIELDS) {
         const value = typeof appLocals[key] === 'string' ? appLocals[key] : '';
         providers[key] = {
             isSet: !!value,
-            maskedValue: maskValue(value)
+            maskedValue: ALLOWED_BASE_URLS.includes(key) ? value : maskValue(value)
         };
     }
     return providers;
@@ -111,7 +119,7 @@ router.put('/apikeys', (req, res) => {
 
     const normalizedUpdates = {};
     for (const [key, value] of entries) {
-        if (!ALLOWED_API_KEYS.includes(key)) {
+        if (!ALLOWED_FIELDS.includes(key)) {
             return res.status(400).json({
                 success: false,
                 error: `Unsupported key: ${key}`
@@ -130,6 +138,7 @@ router.put('/apikeys', (req, res) => {
     for (const key of Object.keys(normalizedUpdates)) {
         previousValues[key] = typeof req.app.locals[key] === 'string' ? req.app.locals[key] : '';
         req.app.locals[key] = normalizedUpdates[key];
+        process.env[key] = normalizedUpdates[key];
     }
 
     try {
@@ -144,6 +153,7 @@ router.put('/apikeys', (req, res) => {
     } catch (error) {
         for (const [key, value] of Object.entries(previousValues)) {
             req.app.locals[key] = value;
+            process.env[key] = value;
         }
 
         return res.status(500).json({

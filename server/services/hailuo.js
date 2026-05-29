@@ -16,7 +16,7 @@
 // ============================================================================
 
 const DEFAULT_HAILUO_BASE_URL = 'https://api.minimax.io/v1';
-const HAILUO_BASE_URL = (process.env.HAILUO_BASE_URL || DEFAULT_HAILUO_BASE_URL).replace(/\/+$/, '');
+const resolveHailuoBaseUrl = (customBaseUrl) => (customBaseUrl || process.env.HAILUO_BASE_URL || DEFAULT_HAILUO_BASE_URL).replace(/\/+$/, '');
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -79,13 +79,13 @@ function mapHailuoDuration(duration) {
  * @param token - Bearer token
  * @param maxWaitMs - Maximum wait time (default 10 minutes)
  */
-async function pollHailuoVideoTask(taskId, token, maxWaitMs = 600000) {
+async function pollHailuoVideoTask(taskId, token, maxWaitMs = 600000, baseUrl) {
     const startTime = Date.now();
     const pollInterval = 5000; // 5 seconds
 
     while (Date.now() - startTime < maxWaitMs) {
         // Correct endpoint: /query/video_generation with task_id as query param
-        const response = await fetch(`${HAILUO_BASE_URL}/query/video_generation?task_id=${taskId}`, {
+        const response = await fetch(`${baseUrl}/query/video_generation?task_id=${taskId}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -118,7 +118,7 @@ async function pollHailuoVideoTask(taskId, token, maxWaitMs = 600000) {
             }
 
             // Fetch the video file URL
-            const fileResponse = await fetch(`${HAILUO_BASE_URL}/files/retrieve?file_id=${fileId}`, {
+            const fileResponse = await fetch(`${baseUrl}/files/retrieve?file_id=${fileId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -180,7 +180,8 @@ export async function generateHailuoVideo({
     aspectRatio,
     resolution,
     duration,
-    apiKey
+    apiKey,
+    baseUrl
 }) {
     if (!apiKey) {
         throw new Error('Hailuo API key not configured');
@@ -250,7 +251,7 @@ export async function generateHailuoVideo({
     console.log('Hailuo request body:', JSON.stringify(bodyForLogging, null, 2));
 
     // Create task
-    const response = await fetch(`${HAILUO_BASE_URL}/video_generation`, {
+    const response = await fetch(`${hailuoBaseUrl}/video_generation`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -277,7 +278,7 @@ export async function generateHailuoVideo({
     console.log(`Hailuo task created: ${taskId}`);
 
     // Poll for completion
-    return await pollHailuoVideoTask(taskId, apiKey);
+    return await pollHailuoVideoTask(taskId, apiKey, 600000, hailuoBaseUrl);
 }
 
 /**
@@ -291,8 +292,11 @@ export async function generateHailuoVideo({
 export async function generateHailuoSubjectVideo({
     prompt,
     subjectImageBase64,
-    apiKey
+    apiKey,
+    baseUrl
 }) {
+    const hailuoBaseUrl = resolveHailuoBaseUrl(baseUrl);
+
     if (!apiKey) {
         throw new Error('Hailuo API key not configured');
     }
@@ -320,7 +324,7 @@ export async function generateHailuoSubjectVideo({
 
     console.log(`Hailuo S2V Gen: Subject reference video`);
 
-    const response = await fetch(`${HAILUO_BASE_URL}/video_generation`, {
+    const response = await fetch(`${hailuoBaseUrl}/video_generation`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -342,5 +346,5 @@ export async function generateHailuoSubjectVideo({
 
     console.log(`Hailuo S2V task created: ${taskId}`);
 
-    return await pollHailuoVideoTask(taskId, apiKey);
+    return await pollHailuoVideoTask(taskId, apiKey, 600000, hailuoBaseUrl);
 }

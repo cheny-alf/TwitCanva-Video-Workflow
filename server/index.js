@@ -78,6 +78,7 @@ if (!KLING_ACCESS_KEY || !KLING_SECRET_KEY) {
 // ============================================================================
 
 const HAILUO_API_KEY = process.env.HAILUO_API_KEY;
+const HAILUO_BASE_URL = process.env.HAILUO_BASE_URL || 'https://api.minimax.io/v1';
 
 if (!HAILUO_API_KEY) {
     console.warn("SERVER WARNING: HAILUO_API_KEY not set. Hailuo AI models will not work.");
@@ -99,6 +100,8 @@ if (!OPENAI_API_KEY) {
 
 const FAL_API_KEY = process.env.FAL_API_KEY;
 const ARK_API_KEY = process.env.ARK_API_KEY;
+const FAL_BASE_URL = process.env.FAL_BASE_URL || 'https://fal.run';
+const ARK_BASE_URL = process.env.ARK_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3';
 
 if (!FAL_API_KEY) {
     console.warn("SERVER WARNING: FAL_API_KEY not set. Kling 2.6 Motion Control will not work.");
@@ -111,10 +114,14 @@ if (!ARK_API_KEY) {
 app.locals.GEMINI_API_KEY = API_KEY;
 app.locals.KLING_ACCESS_KEY = KLING_ACCESS_KEY;
 app.locals.KLING_SECRET_KEY = KLING_SECRET_KEY;
+app.locals.KLING_BASE_URL = KLING_BASE_URL;
 app.locals.HAILUO_API_KEY = HAILUO_API_KEY;
+app.locals.HAILUO_BASE_URL = HAILUO_BASE_URL;
 app.locals.OPENAI_API_KEY = OPENAI_API_KEY;
 app.locals.FAL_API_KEY = FAL_API_KEY;
+app.locals.FAL_BASE_URL = FAL_BASE_URL;
 app.locals.ARK_API_KEY = ARK_API_KEY;
+app.locals.ARK_BASE_URL = ARK_BASE_URL;
 app.locals.IMAGES_DIR = IMAGES_DIR;
 app.locals.VIDEOS_DIR = VIDEOS_DIR;
 app.locals.LIBRARY_DIR = LIBRARY_DIR;
