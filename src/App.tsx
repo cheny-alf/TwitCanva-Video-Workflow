@@ -76,6 +76,131 @@ const urlToBase64 = async (url: string): Promise<string> => {
   }
 };
 
+type Locale = 'en' | 'zh';
+
+const UI_TEXT = {
+  en: {
+    app: {
+      untitledCanvas: 'Untitled Canvas',
+      zoom: 'Zoom'
+    },
+    toolbar: {
+      myWorkflows: 'My Workflows',
+      assets: 'Assets',
+      history: 'History',
+      tools: 'Tools',
+      importTikTok: 'Import TikTok',
+      importTikTokDesc: 'Download without watermark',
+      storyboardGenerator: 'Storyboard Generator',
+      storyboardGeneratorDesc: 'Create scenes with AI',
+      languageSwitch: 'Switch Language',
+      profile: 'Profile'
+    },
+    topbar: {
+      renameHint: 'Double-click to rename',
+      autoSavedPrefix: 'Auto-saved',
+      save: 'Save',
+      newCanvas: 'New',
+      switchToDayMode: 'Switch to Day Mode',
+      switchToNightMode: 'Switch to Night Mode',
+      unsavedChangesTitle: 'Unsaved Changes',
+      unsavedChangesMessage: 'You have unsaved changes. Would you like to save before creating a new canvas?',
+      cancel: 'Cancel',
+      discard: 'Discard',
+      saving: 'Saving...',
+      saveAndNew: 'Save & New'
+    },
+    contextMenu: {
+      createAsset: 'Create Asset',
+      copy: 'Copy',
+      paste: 'Paste',
+      duplicate: 'Duplicate',
+      delete: 'Delete',
+      upload: 'Upload',
+      addAssets: 'Add Assets',
+      addNodes: 'Add Nodes',
+      undo: 'Undo',
+      redo: 'Redo',
+      generateFromThisNode: 'Generate from this node',
+      textGeneration: 'Text Generation',
+      textGenerationDesc: 'Script, Ad copy, Brand text',
+      textNode: 'Text',
+      imageGeneration: 'Image Generation',
+      imageNode: 'Image',
+      imageNodeDesc: 'Promotional image, poster, cover',
+      videoGeneration: 'Video Generation',
+      videoNode: 'Video',
+      imageEditor: 'Image Editor',
+      videoEditor: 'Video Editor',
+      localModelsTitle: 'Local Models (Open Source)',
+      localImageModel: 'Local Image Model',
+      localImageModelDesc: 'Use downloaded open-source models',
+      localVideoModel: 'Local Video Model',
+      localVideoModelDesc: 'AnimateDiff, SVD, and more'
+    }
+  },
+  zh: {
+    app: {
+      untitledCanvas: '未命名画板',
+      zoom: '缩放'
+    },
+    toolbar: {
+      myWorkflows: '我的工作流',
+      assets: '素材',
+      history: '历史记录',
+      tools: '工具',
+      importTikTok: '导入 TikTok',
+      importTikTokDesc: '下载无水印视频',
+      storyboardGenerator: '分镜生成器',
+      storyboardGeneratorDesc: '用 AI 创建场景',
+      languageSwitch: '切换语言',
+      profile: '个人资料'
+    },
+    topbar: {
+      renameHint: '双击重命名',
+      autoSavedPrefix: '已自动保存',
+      save: '保存',
+      newCanvas: '新建',
+      switchToDayMode: '切换到日间模式',
+      switchToNightMode: '切换到夜间模式',
+      unsavedChangesTitle: '有未保存的更改',
+      unsavedChangesMessage: '当前有未保存内容，是否先保存再创建新画板？',
+      cancel: '取消',
+      discard: '不保存',
+      saving: '保存中...',
+      saveAndNew: '保存并新建'
+    },
+    contextMenu: {
+      createAsset: '创建素材',
+      copy: '复制',
+      paste: '粘贴',
+      duplicate: '创建副本',
+      delete: '删除',
+      upload: '上传',
+      addAssets: '添加素材',
+      addNodes: '添加节点',
+      undo: '撤销',
+      redo: '重做',
+      generateFromThisNode: '从该节点生成',
+      textGeneration: '文本生成',
+      textGenerationDesc: '脚本、广告文案、品牌文案',
+      textNode: '文本',
+      imageGeneration: '图像生成',
+      imageNode: '图像',
+      imageNodeDesc: '宣传图、海报、封面',
+      videoGeneration: '视频生成',
+      videoNode: '视频',
+      imageEditor: '图片编辑器',
+      videoEditor: '视频编辑器',
+      localModelsTitle: '本地模型（开源）',
+      localImageModel: '本地图像模型',
+      localImageModelDesc: '使用已下载的开源模型',
+      localVideoModel: '本地视频模型',
+      localVideoModelDesc: 'AnimateDiff、SVD 等'
+    }
+  }
+} as const;
+
 export default function App() {
   // ============================================================================
   // STATE
@@ -90,6 +215,15 @@ export default function App() {
   });
 
   const [canvasTheme, setCanvasTheme] = useState<'dark' | 'light'>('dark');
+  const [locale, setLocale] = useState<Locale>(() => {
+    const savedLocale = localStorage.getItem('twitcanva-locale');
+    return savedLocale === 'zh' ? 'zh' : 'en';
+  });
+  const text = UI_TEXT[locale];
+
+  useEffect(() => {
+    localStorage.setItem('twitcanva-locale', locale);
+  }, [locale]);
 
   // Panel state management (history, chat, asset library, expand)
   const {
@@ -297,8 +431,8 @@ export default function App() {
     setNodes([]);
     setGroups([]); // Reset groups for new canvas
     setSelectedNodeIds([]);
-    setCanvasTitle('Untitled Canvas');
-    setEditingTitleValue('Untitled Canvas');
+    setCanvasTitle(text.app.untitledCanvas);
+    setEditingTitleValue(text.app.untitledCanvas);
     resetWorkflowId(); // Important: ensures new workflow gets a new ID
     setIsDirty(false);
   };
@@ -979,6 +1113,9 @@ export default function App() {
             closeAssetLibrary();
           }}
           canvasTheme={canvasTheme}
+          onToggleLanguage={() => setLocale(prev => prev === 'en' ? 'zh' : 'en')}
+          locale={locale}
+          text={text.toolbar}
         />
       )}
 
@@ -1083,6 +1220,7 @@ export default function App() {
           canvasTheme={canvasTheme}
           onToggleTheme={() => setCanvasTheme(prev => prev === 'dark' ? 'light' : 'dark')}
           lastAutoSaveTime={lastAutoSaveTime}
+          text={text.topbar}
         />
       )}
 
@@ -1318,13 +1456,14 @@ export default function App() {
         canUndo={canUndo}
         canRedo={canRedo}
         canvasTheme={canvasTheme}
+        text={text.contextMenu}
       />
 
       {/* Zoom Slider */}
       {/* Zoom Slider */}
       {!storyboardGenerator.isModalOpen && !isTikTokModalOpen && (
         <div className={`fixed bottom-6 left-16 rounded-full px-4 py-2 flex items-center gap-3 z-50 transition-colors duration-300 ${canvasTheme === 'dark' ? 'bg-neutral-900 border border-neutral-700' : 'bg-white/90 backdrop-blur-sm border border-neutral-200'}`} >
-          <span className={`text-xs ${canvasTheme === 'dark' ? 'text-neutral-400' : 'text-neutral-500'}`}>Zoom</span>
+          <span className={`text-xs ${canvasTheme === 'dark' ? 'text-neutral-400' : 'text-neutral-500'}`}>{text.app.zoom}</span>
           <input
             type="range"
             min="0.1"

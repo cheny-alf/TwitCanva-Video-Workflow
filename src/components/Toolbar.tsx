@@ -38,7 +38,21 @@ interface ToolbarProps {
   onTikTokClick?: (e: React.MouseEvent) => void;
   onStoryboardClick?: (e: React.MouseEvent) => void;
   onToolsOpen?: () => void; // Called when tools dropdown opens to close other panels
+  onToggleLanguage?: () => void;
   canvasTheme?: 'dark' | 'light';
+  locale?: 'en' | 'zh';
+  text?: {
+    myWorkflows: string;
+    assets: string;
+    history: string;
+    tools: string;
+    importTikTok: string;
+    importTikTokDesc: string;
+    storyboardGenerator: string;
+    storyboardGeneratorDesc: string;
+    languageSwitch: string;
+    profile: string;
+  };
 }
 
 // ============================================================================
@@ -53,7 +67,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onTikTokClick,
   onStoryboardClick,
   onToolsOpen,
+  onToggleLanguage,
   canvasTheme = 'dark'
+  ,
+  locale = 'en',
+  text
 }) => {
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
@@ -82,6 +100,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   // Theme-aware styles
   const isDark = canvasTheme === 'dark';
+  const labels = text || {
+    myWorkflows: 'My Workflows',
+    assets: 'Assets',
+    history: 'History',
+    tools: 'Tools',
+    importTikTok: 'Import TikTok',
+    importTikTokDesc: 'Download without watermark',
+    storyboardGenerator: 'Storyboard Generator',
+    storyboardGeneratorDesc: 'Create scenes with AI',
+    languageSwitch: 'Switch Language',
+    profile: 'Profile'
+  };
 
   return (
     <div className={`fixed left-4 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2 p-1 rounded-full shadow-2xl z-50 transition-colors duration-300 ${isDark ? 'bg-[#1a1a1a] border border-neutral-800' : 'bg-white/90 backdrop-blur-sm border border-neutral-200'
@@ -99,14 +129,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           className={`hover:scale-125 transition-all duration-200 ${isDark ? 'text-neutral-400 hover:text-white' : 'text-neutral-500 hover:text-neutral-900'
             }`}
           onClick={onWorkflowsClick}
-          title="My Workflows"
+          title={labels.myWorkflows}
         >
           <LayoutGrid size={20} />
         </button>
         <button
           className={`hover:scale-125 transition-all duration-200 ${isDark ? 'text-neutral-400 hover:text-white' : 'text-neutral-500 hover:text-neutral-900'
             }`}
-          title="Assets"
+          title={labels.assets}
           onClick={onAssetsClick}
         >
           <ImageIcon size={20} />
@@ -115,7 +145,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           className={`hover:scale-125 transition-all duration-200 ${isDark ? 'text-neutral-400 hover:text-white' : 'text-neutral-500 hover:text-neutral-900'
             }`}
           onClick={onHistoryClick}
-          title="History"
+          title={labels.history}
         >
           <History size={20} />
         </button>
@@ -133,7 +163,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               }
               setIsToolsOpen(!isToolsOpen);
             }}
-            title="Tools"
+            title={labels.tools}
           >
             <Wrench size={20} />
           </button>
@@ -151,8 +181,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <TikTokIcon size={16} className={isDark ? 'text-white' : 'text-neutral-700'} />
                 </div>
                 <div className="text-left">
-                  <p className={`text-sm ${isDark ? 'text-neutral-200 group-hover:text-white' : 'text-neutral-700 group-hover:text-neutral-900'}`}>Import TikTok</p>
-                  <p className={`text-xs ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>Download without watermark</p>
+                  <p className={`text-sm ${isDark ? 'text-neutral-200 group-hover:text-white' : 'text-neutral-700 group-hover:text-neutral-900'}`}>{labels.importTikTok}</p>
+                  <p className={`text-xs ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>{labels.importTikTokDesc}</p>
                 </div>
               </button>
 
@@ -166,8 +196,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <Film size={16} className={isDark ? 'text-white' : 'text-neutral-700'} />
                 </div>
                 <div className="text-left">
-                  <p className={`text-sm ${isDark ? 'text-neutral-200 group-hover:text-white' : 'text-neutral-700 group-hover:text-neutral-900'}`}>Storyboard Generator</p>
-                  <p className={`text-xs ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>Create scenes with AI</p>
+                  <p className={`text-sm ${isDark ? 'text-neutral-200 group-hover:text-white' : 'text-neutral-700 group-hover:text-neutral-900'}`}>{labels.storyboardGenerator}</p>
+                  <p className={`text-xs ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>{labels.storyboardGeneratorDesc}</p>
                 </div>
               </button>
             </div>
@@ -177,9 +207,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       <div className={`w-8 h-[1px] my-1 ${isDark ? 'bg-neutral-800' : 'bg-neutral-200'}`}></div>
 
+      <button
+        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold mb-1 transition-all duration-200 hover:scale-110 ${isDark ? 'bg-neutral-800 text-neutral-200 border border-neutral-700 hover:bg-neutral-700' : 'bg-neutral-100 text-neutral-800 border border-neutral-300 hover:bg-neutral-200'
+          }`}
+        onClick={onToggleLanguage}
+        title={labels.languageSwitch}
+      >
+        {locale === 'zh' ? '中' : 'EN'}
+      </button>
+
       <button className={`w-8 h-8 rounded-full overflow-hidden mb-2 hover:scale-110 transition-all duration-200 ${isDark ? 'border border-neutral-700' : 'border border-neutral-300'
-        }`}>
-        <img src="https://picsum.photos/40/40" alt="Profile" className="w-full h-full object-cover" />
+        }`} title={labels.profile}>
+        <img src="https://picsum.photos/40/40" alt={labels.profile} className="w-full h-full object-cover" />
       </button>
     </div>
   );
